@@ -21,7 +21,7 @@
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
+#include "usbd_cdc_if.h"
 
 /* USER CODE END Includes */
 
@@ -73,7 +73,9 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  uint8_t gpsByte;
+  uint8_t gpsLine[128];
+  uint16_t gpsLen;
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
@@ -85,6 +87,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
 
   /* USER CODE END Init */
 
@@ -109,7 +112,45 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+    if (HAL_UART_Receive(&huart3, &gpsByte, 1, 100) == HAL_OK)
+{
+    if (gpsByte == '\n')
+    {
+        if (gpsLen > 0 && gpsLen <= sizeof(gpsLine) - 2)
+        {
+            gpsLine[gpsLen++] = '\r';
+            gpsLine[gpsLen++] = '\n';
 
+            uint8_t status;
+            do
+            {
+                status = CDC_Transmit_FS(gpsLine, gpsLen);
+                if (status == USBD_BUSY)
+                {
+                    HAL_Delay(1);
+                }
+            } while (status == USBD_BUSY);
+
+            if (status != USBD_OK)
+            {
+                Error_Handler();
+            }
+        }
+
+        gpsLen = 0;
+    }
+    else if (gpsByte != '\r')
+    {
+        if (gpsLen < sizeof(gpsLine) - 2)
+        {
+            gpsLine[gpsLen++] = gpsByte;
+        }
+        else
+        {
+            gpsLen = 0; // Discard an overlong line
+        }
+    }
+}
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
